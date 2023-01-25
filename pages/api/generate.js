@@ -15,23 +15,58 @@ export default async function (req, res) {
     return;
   }
 
-  const animal = req.body.animal || '';
-  if (animal.trim().length === 0) {
+  const { char_name, char_age, char_gender, char_race, char_class, char_alignment, char_description } = req.body;
+  // Validate the input
+  if (char_name.trim().length === 0) {
     res.status(400).json({
       error: {
-        message: "Please enter a valid animal",
+        message: "Please enter a valid name",
       }
     });
     return;
   }
 
   try {
-    const completion = await openai.createCompletion({
+    const backstory = await openai.createCompletion({
       model: "text-davinci-003",
-      prompt: generatePrompt(animal),
-      temperature: 0.6,
+      prompt: generateBackstoryPrompt(char_name, char_age, char_gender, char_race, char_class, char_alignment, char_description),
+      temperature: 0.35,
+      max_tokens: 400,
+      top_p: 1,
+      frequency_penalty: 0.5,
+      presence_penalty: 0.35
     });
-    res.status(200).json({ result: completion.data.choices[0].text });
+    /*
+    const description = await openai.createCompletion({
+      model: "text-davinci-003",
+      prompt: generateDescriptionPrompt(char_name, backstory.data.choices[0].text),
+      temperature: 0.75,
+      max_tokens: 200,
+      top_p: 1,
+      frequency_penalty: 0.5,
+      presence_penalty: 0.2
+    });
+    const organization = await openai.createCompletion({
+      model: "text-davinci-003",
+      prompt: generateOrganizationsPrompt(char_name, backstory.data.choices[0].text, description.data.choices[0].text),
+      temperature: 0.25,
+      max_tokens: 100,
+      top_p: 1,
+      frequency_penalty: 0.5,
+      presence_penalty: 0.2
+    });
+    const relationships = await openai.createCompletion({
+      model: "text-daVinci-003",
+      prompt: generateAlliesAndEnemiesPrompt(char_name, backstory.data.choices[0].text, description.data.choices[0].text, organization.data.choices[0].text),
+      temperature: 0.5,
+      max_tokens: 100,
+      top_p: 1,
+      frequency_penalty: 0.5,
+      presence_penalty: 0.2
+    });
+    */
+    res.status(200).json({ backstory: backstory.data.choices[0].text });
+
   } catch(error) {
     // Consider adjusting the error handling logic for your use case
     if (error.response) {
@@ -48,15 +83,48 @@ export default async function (req, res) {
   }
 }
 
-function generatePrompt(animal) {
-  const capitalizedAnimal =
-    animal[0].toUpperCase() + animal.slice(1).toLowerCase();
-  return `Suggest three names for an animal that is a superhero.
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
-Animal: Cat
-Names: Captain Sharpclaw, Agent Fluffball, The Incredible Feline
-Animal: Dog
-Names: Ruff the Protector, Wonder Canine, Sir Barks-a-Lot
-Animal: ${capitalizedAnimal}
-Names:`;
+function generateBackstoryPrompt(char_name, char_age, char_gender, char_race, char_class, char_alignment, char_description) {
+  let char_age_text = "the " + char_age + " years old,";
+  if (isNaN(char_age)) char_age_text = char_age;
+
+  let char_class_text = "Class: " + char_class;
+  if (char_class === "") char_class_text = "";
+
+  let char_alignment_text = "Alignment: " + char_alignment;
+  if (char_alignment === "") char_alignment_text = "";
+
+  return `Write a backstory for ${capitalize(char_name)} ${char_age_text} ${char_gender} ${char_race}:
+
+${char_class_text}
+${char_alignment_text}
+
+${char_description}`;
+}
+
+function generateDescriptionPrompt(char_name, backstory) {
+  return `Write a description for ${capitalize(char_name)}:
+
+${backstory}`;
+}
+
+function generateAlliesAndEnemiesPrompt(char_name, backstory, description, organization) {
+  return `Write about ${capitalize(char_name)}'s allies and enemies:
+
+${backstory}
+
+${description}
+
+${organization}`;
+}
+
+function generateOrganizationsPrompt(char_name, backstory, description) {
+  return `Write about ${capitalize(char_name)}'s related organization:
+
+${backstory}
+
+${description}`;
 }
